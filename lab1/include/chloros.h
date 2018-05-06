@@ -48,6 +48,7 @@ struct Thread {
   State state;
   Context context;
   uint8_t* stack;
+  uint8_t* unaligned_stack;
 
   // Constructor. `create_stack` specifies whether we want to create a stack
   // associated with this thread.

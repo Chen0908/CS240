@@ -49,12 +49,22 @@ thread_local uint64_t initial_thread_id;
 
 }  // anonymous namespace
 
-std::atomic<uint64_t> Thread::next_id;
+std::atomic<uint64_t> Thread::next_id(0);
 
 Thread::Thread(bool create_stack)
-    : id{0}, state{State::kWaiting}, context{}, stack{nullptr} {
+    : id{next_id++}, state{State::kWaiting}, context{}, stack{nullptr}, 
+      unaligned_stack{nullptr} {
   // FIXME: Phase 1
-  
+  if(create_stack){
+    unaligned_stack = new uint8_t[kStackSize + 15];
+    if(reinterpret_cast<uintptr_t>(unaligned_stack) % 16 == 0){
+      stack = unaligned_stack;
+    }
+    else{
+      stack = (uint8_t*)(((uint64_t)unaligned_stack + 0x10) & (~0xf));
+    }  
+  }
+
   static_cast<void>(create_stack);
   // These two initial values are provided for you.
   context.mxcsr = 0x1F80;
@@ -63,6 +73,7 @@ Thread::Thread(bool create_stack)
 
 Thread::~Thread() {
   // FIXME: Phase 1
+  delete[] unaligned_stack;
 }
 
 void Thread::PrintDebug() {
