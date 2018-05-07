@@ -5,6 +5,7 @@
 #error Library only implemented for AMD64.
 #endif
 
+#include "debug-utils.h"
 #include <cstdint>
 #include <memory>
 #include <type_traits>

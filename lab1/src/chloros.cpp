@@ -9,6 +9,7 @@
 #include <queue>
 #include <vector>
 #include "common.h"
+#include <iostream>
 
 extern "C" {
 
@@ -31,6 +32,7 @@ constexpr int const kStackSize{1 << 21};
 
 // Queue of threads that are not running.
 std::vector<std::unique_ptr<Thread>> thread_queue{};
+uint64_t curr_pos(-1); // round-robin starts at curr_pos + 1
 
 // Mutex protecting the queue, which will potentially be accessed by multiple
 // kernel threads.
@@ -118,6 +120,13 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
+  new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
+  std::lock_guard<std::mutex> lg(queue_lock);
+std::cout << "ye 1" << std::endl;
+  thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
+std::cout << "ye 2" << std::endl;
+  Yield(false);
+std::cout << "ye 3" << std::endl;
   static_cast<void>(fn);
   static_cast<void>(arg);
 }
@@ -129,7 +138,39 @@ bool Yield(bool only_ready) {
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
   static_cast<void>(only_ready);
-  return true;
+  PIN
+  if(thread_queue.empty()) {
+    PIN
+    return false;
+  }
+  PIN
+  // std::lock_guard<std::mutex> lg(queue_lock);
+  PIN
+  uint64_t i = (curr_pos + 1) % thread_queue.size();
+  PIN
+  while (i != curr_pos) {
+    LOGC(i)
+    PRINTF("size =  %d %d",thread_queue.size(), thread_queue[i]->state)
+    if ((only_ready && thread_queue[i]->state == Thread::State::kReady)
+      || (!only_ready && (thread_queue[i]->state == Thread::State::kReady 
+      || thread_queue.back()->state == Thread::State::kWaiting))) {
+      if (current_thread->state == Thread::State::kRunning) {
+        current_thread->state = Thread::State::kReady;
+      }
+      std::swap(current_thread, thread_queue[i]);
+      PIN
+      current_thread->state = Thread::State::kRunning;
+      PIN
+      ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
+      PIN
+      curr_pos = i;
+      PIN
+      return true;
+    }
+    i = (i + 1) % thread_queue.size();
+  }
+  PIN
+  return false;
 }
 
 void Wait() {
