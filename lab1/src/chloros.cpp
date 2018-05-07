@@ -58,7 +58,7 @@ Thread::Thread(bool create_stack)
       unaligned_stack{nullptr} {
   // FIXME: Phase 1
   if(create_stack){
-    unaligned_stack = new uint8_t[kStackSize + 15];
+    unaligned_stack = (uint8_t *)std::calloc(kStackSize + 15, sizeof(uint8_t)); // new uint8_t[kStackSize + 15];
     if(reinterpret_cast<uintptr_t>(unaligned_stack) % 16 == 0){
       stack = unaligned_stack;
     }
@@ -75,7 +75,7 @@ Thread::Thread(bool create_stack)
 
 Thread::~Thread() {
   // FIXME: Phase 1
-  delete[] unaligned_stack;
+  free(unaligned_stack); // delete[] unaligned_stack;
 }
 
 void Thread::PrintDebug() {
@@ -121,14 +121,18 @@ void Spawn(Function fn, void* arg) {
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
   new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
+  *(Function *)(new_thread->context.rsp) = fn;
+  new_thread->context.rsp++;
+  *(void **)(new_thread->context.rsp) = arg;
+  new_thread->context.rsp++;
+  *(new_thread->stack);
+  LOGC((void *)(new_thread->stack));
   std::lock_guard<std::mutex> lg(queue_lock);
 std::cout << "ye 1" << std::endl;
   thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
 std::cout << "ye 2" << std::endl;
   Yield(false);
 std::cout << "ye 3" << std::endl;
-  static_cast<void>(fn);
-  static_cast<void>(arg);
 }
 
 bool Yield(bool only_ready) {
@@ -161,6 +165,8 @@ bool Yield(bool only_ready) {
       PIN
       current_thread->state = Thread::State::kRunning;
       PIN
+      LOGC((void *)&(thread_queue[i]->context));
+      LOGC((void *)&(current_thread->context));
       ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
       PIN
       curr_pos = i;
