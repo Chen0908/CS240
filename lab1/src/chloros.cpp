@@ -59,12 +59,10 @@ Thread::Thread(bool create_stack)
   // FIXME: Phase 1
   if(create_stack){
     unaligned_stack = (uint8_t *)std::calloc(kStackSize + 15, sizeof(uint8_t)); // new uint8_t[kStackSize + 15];
-    if(reinterpret_cast<uintptr_t>(unaligned_stack) % 16 == 0){
-      stack = unaligned_stack;
+    stack = unaligned_stack + (kStackSize + 15); // move the high end
+    if (reinterpret_cast<uintptr_t>(stack) % 16 != 0) {
+      stack = (uint8_t*)(((uint64_t)stack) & (~0xf));
     }
-    else{
-      stack = (uint8_t*)(((uint64_t)unaligned_stack + 0x10) & (~0xf));
-    }  
   }
 
   static_cast<void>(create_stack);
@@ -125,7 +123,6 @@ void Spawn(Function fn, void* arg) {
   new_thread->context.rsp++;
   *(void **)(new_thread->context.rsp) = arg;
   new_thread->context.rsp++;
-  *(new_thread->stack);
   LOGC((void *)(new_thread->stack));
   std::lock_guard<std::mutex> lg(queue_lock);
 std::cout << "ye 1" << std::endl;
