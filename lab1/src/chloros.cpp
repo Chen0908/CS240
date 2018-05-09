@@ -58,7 +58,7 @@ Thread::Thread(bool create_stack)
       unaligned_stack{nullptr} {
   // FIXME: Phase 1
   if(create_stack){
-    unaligned_stack = (uint8_t *)std::calloc(kStackSize + 15, sizeof(uint8_t)); // new uint8_t[kStackSize + 15];
+    unaligned_stack = (uint8_t *)std::calloc(kStackSize + 15, sizeof(uint8_t));
     stack = unaligned_stack + (kStackSize + 15); // move the high end
     if (reinterpret_cast<uintptr_t>(stack) % 16 != 0) {
       stack = (uint8_t*)(((uint64_t)stack) & (~0xf));
@@ -73,7 +73,7 @@ Thread::Thread(bool create_stack)
 
 Thread::~Thread() {
   // FIXME: Phase 1
-  free(unaligned_stack); // delete[] unaligned_stack;
+  free(unaligned_stack);
 }
 
 void Thread::PrintDebug() {
@@ -111,8 +111,6 @@ void Initialize() {
   new_thread->state = Thread::State::kWaiting;
   initial_thread_id = new_thread->id;
   current_thread = std::move(new_thread);
-  //FIXME
-  
 }
 
 void Spawn(Function fn, void* arg) {
@@ -121,15 +119,10 @@ void Spawn(Function fn, void* arg) {
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
 
-
-  new_thread->context.rbp = reinterpret_cast<uint64_t>(new_thread->stack - 8);
   *(uint64_t *)new_thread->stack = reinterpret_cast<uint64_t>(&StartThread);
-  *(uint64_t *)(new_thread->stack - 8) = reinterpret_cast<uint64_t>(new_thread->stack - 32);
-  *(uint64_t *)(new_thread->stack - 16) = reinterpret_cast<uint64_t>(fn);
-  new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack - 16);
-  *(uint64_t *)(new_thread->stack - 24) = reinterpret_cast<uint64_t>(arg);
-
-  std::lock_guard<std::mutex> lg(queue_lock);
+  *(uint64_t *)(new_thread->stack + 8) = reinterpret_cast<uint64_t>(fn);
+  *(uint64_t *)(new_thread->stack + 16) = reinterpret_cast<uint64_t>(arg);
+  new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
   thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
   Yield(false);
 }
@@ -140,28 +133,29 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
+  
   static_cast<void>(only_ready);
   if(thread_queue.empty()) {
     return false;
   }
-  // std::lock_guard<std::mutex> lg(queue_lock);
-  uint64_t i = (curr_pos) % thread_queue.size();
-
-  do {
+  
+  uint64_t i = (curr_pos + 1) % thread_queue.size();
+  int sz = thread_queue.size();
+  while(sz--){
     if ((only_ready && thread_queue[i]->state == Thread::State::kReady)
       || (!only_ready && (thread_queue[i]->state == Thread::State::kReady 
-      || thread_queue.back()->state == Thread::State::kWaiting))) {
+      || thread_queue[i]->state == Thread::State::kWaiting))) {
       if (current_thread->state == Thread::State::kRunning) {
         current_thread->state = Thread::State::kReady;
-      }
-      std::swap(current_thread, thread_queue[i]);
+      }    
+      std::swap(current_thread, thread_queue[i]); 
       current_thread->state = Thread::State::kRunning;
-      ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
       curr_pos = i;
+      ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
       return true;
     }
     i = (i + 1) % thread_queue.size();
-  } while (i != curr_pos);
+  }
   return false;
 }
 
@@ -192,11 +186,14 @@ std::pair<int, int> GetThreadCount() {
 }
 
 void ThreadEntry(Function fn, void* arg) {
+  // current_thread->PrintDebug();
   fn(arg);
   current_thread->state = Thread::State::kZombie;
   LOG_DEBUG("Thread %" PRId64 " exiting.", current_thread->id);
+  
   // A thread that is spawn will always die yielding control to other threads.
   chloros::Yield();
+
   // Unreachable here. Why?
   ASSERT(false);
 }
