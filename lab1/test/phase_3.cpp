@@ -22,18 +22,11 @@ void Worker(void*) {
 void WorkerWithArgument(void* arg) { counter = *reinterpret_cast<int*>(&arg); }
 
 static void CheckYield() {
-  LOG("yo");
   ASSERT(chloros::Yield() == false);
-  LOG("yo1");
-
   chloros::Spawn(Worker, nullptr);
-  LOG("yo2");
   ASSERT(counter == 1);
-  LOG("yo3");
   chloros::Wait();
-  LOG("yo4");
   ASSERT(counter == 2);
-  LOG("yo5");
   ASSERT(chloros::Yield() == false);
 }
 
@@ -76,11 +69,8 @@ static void CheckYieldLoop() {
 
 int main() {
   chloros::Initialize();
-  LOG("hahaha 1");
   CheckYield();
-  LOG("hahaha 2");
   CheckSpawn();
-  LOG("hahaha 3");
   CheckStackAlignment();
   CheckYieldLoop();
   LOG("Phase 3 passed!");

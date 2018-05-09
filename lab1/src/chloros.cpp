@@ -111,6 +111,8 @@ void Initialize() {
   new_thread->state = Thread::State::kWaiting;
   initial_thread_id = new_thread->id;
   current_thread = std::move(new_thread);
+  //FIXME
+  
 }
 
 void Spawn(Function fn, void* arg) {
@@ -118,16 +120,15 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-  //new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
+
+
   new_thread->context.rbp = reinterpret_cast<uint64_t>(new_thread->stack - 8);
   *(uint64_t *)new_thread->stack = reinterpret_cast<uint64_t>(&StartThread);
   *(uint64_t *)(new_thread->stack - 8) = reinterpret_cast<uint64_t>(new_thread->stack - 32);
   *(uint64_t *)(new_thread->stack - 16) = reinterpret_cast<uint64_t>(fn);
+  new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack - 16);
   *(uint64_t *)(new_thread->stack - 24) = reinterpret_cast<uint64_t>(arg);
-  //*(Function *)(new_thread->context.rsp) = fn;
-  //new_thread->context.rsp++;
-  //*(void **)(new_thread->context.rsp) = arg;
-  //new_thread->context.rsp++;
+
   std::lock_guard<std::mutex> lg(queue_lock);
   thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
   Yield(false);
@@ -144,8 +145,9 @@ bool Yield(bool only_ready) {
     return false;
   }
   // std::lock_guard<std::mutex> lg(queue_lock);
-  uint64_t i = (curr_pos + 1) % thread_queue.size();
-  while (i != curr_pos) {
+  uint64_t i = (curr_pos) % thread_queue.size();
+
+  do {
     if ((only_ready && thread_queue[i]->state == Thread::State::kReady)
       || (!only_ready && (thread_queue[i]->state == Thread::State::kReady 
       || thread_queue.back()->state == Thread::State::kWaiting))) {
@@ -154,17 +156,12 @@ bool Yield(bool only_ready) {
       }
       std::swap(current_thread, thread_queue[i]);
       current_thread->state = Thread::State::kRunning;
-      LOGC((void *)&(thread_queue[i]->context));
-      LOGC((void *)&(current_thread->context));
-      PIN
       ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
-      PIN
       curr_pos = i;
       return true;
     }
     i = (i + 1) % thread_queue.size();
-  }
-  PIN
+  } while (i != curr_pos);
   return false;
 }
 
