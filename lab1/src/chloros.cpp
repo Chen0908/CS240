@@ -33,7 +33,7 @@ constexpr int const kStackSize{1 << 21};
 // Queue of threads that are not running.
 std::vector<std::unique_ptr<Thread>> thread_queue{};
 uint64_t curr_pos(-1); // round-robin starts at curr_pos + 1
-
+std::atomic<bool> exist_zombie(false);
 // Mutex protecting the queue, which will potentially be accessed by multiple
 // kernel threads.
 std::mutex queue_lock{};
@@ -133,7 +133,10 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  
+  if (exist_zombie) {
+    GarbageCollect();
+    exist_zombie = false;
+  }
   static_cast<void>(only_ready);
   if(thread_queue.empty()) {
     return false;
@@ -168,6 +171,18 @@ void Wait() {
 
 void GarbageCollect() {
   // FIXME: Phase 4
+  std::vector<std::unique_ptr<Thread>> new_queue;
+  uint64_t zombie_before_curr_pos = 0;
+  for (uint64_t i = 0; i < thread_queue.size(); i++) {
+    if (thread_queue[i]->state != Thread::State::kZombie) {
+      new_queue.push_back(std::move(thread_queue[i]));
+    }
+    else { // thread_queue[i] is zombie
+      if (i <= curr_pos) { zombie_before_curr_pos++; }
+    }
+  }
+  curr_pos -= zombie_before_curr_pos;
+  swap(new_queue, thread_queue);
 }
 
 std::pair<int, int> GetThreadCount() {
@@ -189,6 +204,7 @@ void ThreadEntry(Function fn, void* arg) {
   // current_thread->PrintDebug();
   fn(arg);
   current_thread->state = Thread::State::kZombie;
+  exist_zombie = true;
   LOG_DEBUG("Thread %" PRId64 " exiting.", current_thread->id);
   
   // A thread that is spawn will always die yielding control to other threads.
