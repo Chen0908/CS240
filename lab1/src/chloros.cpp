@@ -118,12 +118,14 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-
+queue_lock.lock();
   *(uint64_t *)new_thread->stack = reinterpret_cast<uint64_t>(&StartThread);
   *(uint64_t *)(new_thread->stack + 8) = reinterpret_cast<uint64_t>(fn);
   *(uint64_t *)(new_thread->stack + 16) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
+  
   thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
+  queue_lock.unlock();
   Yield(false);
 }
 
@@ -134,7 +136,9 @@ bool Yield(bool only_ready) {
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
   static_cast<void>(only_ready);
-  if(thread_queue.empty()) {
+  queue_lock.lock();
+  if (thread_queue.empty()) {
+    queue_lock.unlock();
     return false;
   }
   
@@ -156,10 +160,12 @@ bool Yield(bool only_ready) {
         GarbageCollect();
         exist_zombie = false;
       }
+      queue_lock.unlock();
       return true;
     }
     i = (i + 1) % thread_queue.size();
   }
+  queue_lock.unlock();
   return false;
 }
 
@@ -202,7 +208,7 @@ std::pair<int, int> GetThreadCount() {
 }
 
 void ThreadEntry(Function fn, void* arg) {
-  // current_thread->PrintDebug();
+  queue_lock.unlock();
   fn(arg);
   current_thread->state = Thread::State::kZombie;
   exist_zombie = true;

@@ -5,6 +5,11 @@
 		"__split_buffer": "cpp",
 		"deque": "cpp",
 		"string": "cpp",
-		"vector": "cpp"
+		"vector": "cpp",
+		"array": "cpp",
+		"iterator": "cpp",
+		"queue": "cpp",
+		"string_view": "cpp",
+		"unordered_set": "cpp"
 	}
 }
