@@ -133,10 +133,6 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  if (exist_zombie) {
-    GarbageCollect();
-    exist_zombie = false;
-  }
   static_cast<void>(only_ready);
   if(thread_queue.empty()) {
     return false;
@@ -144,7 +140,7 @@ bool Yield(bool only_ready) {
   
   uint64_t i = (curr_pos + 1) % thread_queue.size();
   int sz = thread_queue.size();
-  while(sz--){
+  while (sz--) {
     if ((only_ready && thread_queue[i]->state == Thread::State::kReady)
       || (!only_ready && (thread_queue[i]->state == Thread::State::kReady 
       || thread_queue[i]->state == Thread::State::kWaiting))) {
@@ -154,7 +150,12 @@ bool Yield(bool only_ready) {
       std::swap(current_thread, thread_queue[i]); 
       current_thread->state = Thread::State::kRunning;
       curr_pos = i;
+
       ContextSwitch(&(thread_queue[i]->context), &(current_thread->context));
+      if (exist_zombie) {
+        GarbageCollect();
+        exist_zombie = false;
+      }
       return true;
     }
     i = (i + 1) % thread_queue.size();
