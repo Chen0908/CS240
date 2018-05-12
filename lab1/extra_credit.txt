@@ -1,0 +1,7 @@
+Extra Credit: data race (test/double-check-locking-pattern.cpp)
+
+"describing what you have done to create the data race, and how ThreadSanitizer catches it" -
+
+Data race: global variables "data" and "ready" are initialized to 0. One thread sets "data" to be 2000 and set "ready" to be 1. The other thread uses a spin lock to wait "ready" to be changed to 1, and invoke use() to print "data"'s value afterwards. There is a data race, because "ready" might become 1 before data is set to 2000, since sequential consitency can't be guaranteed.
+
+How ThreadSanitizer catches this data race: ThreadSanitizer runs with a happens-before model, and it notices the discrepency of access order to the global variable among mutiple runs.
