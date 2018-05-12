@@ -32,7 +32,7 @@ constexpr int const kStackSize{1 << 21};
 
 // Queue of threads that are not running.
 std::vector<std::unique_ptr<Thread>> thread_queue{};
-uint64_t curr_pos(-1); // round-robin starts at curr_pos + 1
+std::atomic<uint64_t> curr_pos(-1); // round-robin starts at curr_pos + 1
 std::atomic<bool> exist_zombie(false);
 // Mutex protecting the queue, which will potentially be accessed by multiple
 // kernel threads.
@@ -118,12 +118,12 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-queue_lock.lock();
+  
   *(uint64_t *)new_thread->stack = reinterpret_cast<uint64_t>(&StartThread);
   *(uint64_t *)(new_thread->stack + 8) = reinterpret_cast<uint64_t>(fn);
   *(uint64_t *)(new_thread->stack + 16) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp = reinterpret_cast<uint64_t>(new_thread->stack);
-  
+  queue_lock.lock();
   thread_queue.insert(thread_queue.begin() + curr_pos + 1, std::move(new_thread));
   queue_lock.unlock();
   Yield(false);

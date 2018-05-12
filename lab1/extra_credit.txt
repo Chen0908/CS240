@@ -4,4 +4,110 @@ Extra Credit: data race (test/double-check-locking-pattern.cpp)
 
 Data race: global variables "data" and "ready" are initialized to 0. One thread sets "data" to be 2000 and set "ready" to be 1. The other thread uses a spin lock to wait "ready" to be changed to 1, and invoke use() to print "data"'s value afterwards. There is a data race, because "ready" might become 1 before data is set to 2000, since sequential consitency can't be guaranteed.
 
-How ThreadSanitizer catches this data race: ThreadSanitizer runs with a happens-before model, and it notices the discrepency of access order to the global variable among mutiple runs.
+How ThreadSanitizer catches this data race: - 
+
+ThreadSanitizer runs with a happens-before model, and it notices the discrepency of access order to the global variable among mutiple runs.
+
+
+==============================================================================
+ThreadSanitizer Terminal Output:
+
+Green thread on kernel thread.
+==================
+WARNING: ThreadSanitizer: data race (pid=13505)
+  Write of size 4 at 0x000000611390 by thread T1:
+    #0 GreenThreadWorker1(void*) test/double-check-locking-pattern.cpp:29 (double-check-locking-pattern+0x0000004023b7)
+    #1 thread_entry src/chloros.cpp:212 (double-check-locking-pattern+0x000000406c75)
+    #2 <null> <null> (double-check-locking-pattern+0x00000040a5d0)
+    #3 chloros::Spawn(void (*)(void*), void*) src/chloros.cpp:129 (double-check-locking-pattern+0x0000004065c4)
+    #4 KernelThreadWorker(int) test/double-check-locking-pattern.cpp:40 (double-check-locking-pattern+0x00000040247b)
+    #5 void std::_Bind_simple<void (*(int))(int)>::_M_invoke<0ul>(std::_Index_tuple<0ul>) <null> (double-check-locking-pattern+0x000000405c68)
+    #6 std::_Bind_simple<void (*(int))(int)>::operator()() <null> (double-check-locking-pattern+0x000000405a90)
+    #7 std::thread::_Impl<std::_Bind_simple<void (*(int))(int)> >::_M_run() <null> (double-check-locking-pattern+0x0000004059c8)
+    #8 <null> <null> (libstdc++.so.6+0x0000000b8c7f)
+
+  Previous read of size 4 at 0x000000611390 by thread T2:
+    #0 GreenThreadWorker2(void*) test/double-check-locking-pattern.cpp:33 (double-check-locking-pattern+0x000000402405)
+    #1 thread_entry src/chloros.cpp:212 (double-check-locking-pattern+0x000000406c75)
+    #2 <null> <null> (double-check-locking-pattern+0x00000040a5d0)
+    #3 chloros::Spawn(void (*)(void*), void*) src/chloros.cpp:129 (double-check-locking-pattern+0x0000004065c4)
+    #4 KernelThreadWorker(int) test/double-check-locking-pattern.cpp:43 (double-check-locking-pattern+0x000000402492)
+    #5 void std::_Bind_simple<void (*(int))(int)>::_M_invoke<0ul>(std::_Index_tuple<0ul>) <null> (double-check-locking-pattern+0x000000405c68)
+    #6 std::_Bind_simple<void (*(int))(int)>::operator()() <null> (double-check-locking-pattern+0x000000405a90)
+    #7 std::thread::_Impl<std::_Bind_simple<void (*(int))(int)> >::_M_run() <null> (double-check-locking-pattern+0x0000004059c8)
+    #8 <null> <null> (libstdc++.so.6+0x0000000b8c7f)
+
+  Location is global 'ready' of size 4 at 0x000000611390 (double-check-locking-pattern+0x000000611390)
+
+  Thread T1 (tid=13507, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.0+0x000000027577)
+    #1 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>, void (*)()) <null> (libstdc++.so.6+0x0000000b8dc2)
+    #2 void __gnu_cxx::new_allocator<std::thread>::construct<std::thread, void (&)(int), int>(std::thread*, void (&)(int), int&&) <null> (double-check-locking-pattern+0x0000004034c1)
+    #3 _ZNSt16allocator_traitsISaISt6threadEE9constructIS0_IRFviEiEEEvRS1_PT_DpOT0_ <null> (double-check-locking-pattern+0x000000402fc8)
+    #4 void std::vector<std::thread, std::allocator<std::thread> >::_M_emplace_back_aux<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000403091)
+    #5 void std::vector<std::thread, std::allocator<std::thread> >::emplace_back<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000402cfb)
+    #6 main test/double-check-locking-pattern.cpp:51 (double-check-locking-pattern+0x000000402524)
+
+  Thread T2 (tid=13508, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.0+0x000000027577)
+    #1 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>, void (*)()) <null> (libstdc++.so.6+0x0000000b8dc2)
+    #2 void __gnu_cxx::new_allocator<std::thread>::construct<std::thread, void (&)(int), int>(std::thread*, void (&)(int), int&&) <null> (double-check-locking-pattern+0x0000004034c1)
+    #3 _ZNSt16allocator_traitsISaISt6threadEE9constructIS0_IRFviEiEEEvRS1_PT_DpOT0_ <null> (double-check-locking-pattern+0x000000402fc8)
+    #4 void std::vector<std::thread, std::allocator<std::thread> >::_M_emplace_back_aux<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000403091)
+    #5 void std::vector<std::thread, std::allocator<std::thread> >::emplace_back<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000402cfb)
+    #6 main test/double-check-locking-pattern.cpp:52 (double-check-locking-pattern+0x00000040254c)
+
+SUMMARY: ThreadSanitizer: data race test/double-check-locking-pattern.cpp:29 GreenThreadWorker1(void*)
+==================
+D0511 21:56:40.466522 13505 src/chloros.cpp:215: ThreadEntry] Thread 1 exiting.
+==================
+WARNING: ThreadSanitizer: data race (pid=13505)
+  Read of size 4 at 0x00000061138c by thread T2:
+    #0 GreenThreadWorker2(void*) test/double-check-locking-pattern.cpp:34 (double-check-locking-pattern+0x00000040241b)
+    #1 thread_entry src/chloros.cpp:212 (double-check-locking-pattern+0x000000406c75)
+    #2 <null> <null> (double-check-locking-pattern+0x00000040a5d0)
+    #3 chloros::Spawn(void (*)(void*), void*) src/chloros.cpp:129 (double-check-locking-pattern+0x0000004065c4)
+    #4 KernelThreadWorker(int) test/double-check-locking-pattern.cpp:43 (double-check-locking-pattern+0x000000402492)
+    #5 void std::_Bind_simple<void (*(int))(int)>::_M_invoke<0ul>(std::_Index_tuple<0ul>) <null> (double-check-locking-pattern+0x000000405c68)
+    #6 std::_Bind_simple<void (*(int))(int)>::operator()() <null> (double-check-locking-pattern+0x000000405a90)
+    #7 std::thread::_Impl<std::_Bind_simple<void (*(int))(int)> >::_M_run() <null> (double-check-locking-pattern+0x0000004059c8)
+    #8 <null> <null> (libstdc++.so.6+0x0000000b8c7f)
+
+  Previous write of size 4 at 0x00000061138c by thread T1:
+    #0 GreenThreadWorker1(void*) test/double-check-locking-pattern.cpp:28 (double-check-locking-pattern+0x0000004023a3)
+    #1 thread_entry src/chloros.cpp:212 (double-check-locking-pattern+0x000000406c75)
+    #2 <null> <null> (double-check-locking-pattern+0x00000040a5d0)
+    #3 chloros::Spawn(void (*)(void*), void*) src/chloros.cpp:129 (double-check-locking-pattern+0x0000004065c4)
+    #4 KernelThreadWorker(int) test/double-check-locking-pattern.cpp:40 (double-check-locking-pattern+0x00000040247b)
+    #5 void std::_Bind_simple<void (*(int))(int)>::_M_invoke<0ul>(std::_Index_tuple<0ul>) <null> (double-check-locking-pattern+0x000000405c68)
+Finished thread 0.
+    #6 std::_Bind_simple<void (*(int))(int)>::operator()() <null> (double-check-locking-pattern+0x000000405a90)
+    #7 std::thread::_Impl<std::_Bind_simple<void (*(int))(int)> >::_M_run() <null> (double-check-locking-pattern+0x0000004059c8)
+    #8 <null> <null> (libstdc++.so.6+0x0000000b8c7f)
+
+  Location is global 'data' of size 4 at 0x00000061138c (double-check-locking-pattern+0x00000061138c)
+
+  Thread T2 (tid=13508, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.0+0x000000027577)
+    #1 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>, void (*)()) <null> (libstdc++.so.6+0x0000000b8dc2)
+    #2 void __gnu_cxx::new_allocator<std::thread>::construct<std::thread, void (&)(int), int>(std::thread*, void (&)(int), int&&) <null> (double-check-locking-pattern+0x0000004034c1)
+    #3 _ZNSt16allocator_traitsISaISt6threadEE9constructIS0_IRFviEiEEEvRS1_PT_DpOT0_ <null> (double-check-locking-pattern+0x000000402fc8)
+    #4 void std::vector<std::thread, std::allocator<std::thread> >::_M_emplace_back_aux<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000403091)
+    #5 void std::vector<std::thread, std::allocator<std::thread> >::emplace_back<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000402cfb)
+    #6 main test/double-check-locking-pattern.cpp:52 (double-check-locking-pattern+0x00000040254c)
+
+  Thread T1 (tid=13507, running) created by main thread at:
+    #0 pthread_create <null> (libtsan.so.0+0x000000027577)
+    #1 std::thread::_M_start_thread(std::shared_ptr<std::thread::_Impl_base>, void (*)()) <null> (libstdc++.so.6+0x0000000b8dc2)
+    #2 void __gnu_cxx::new_allocator<std::thread>::construct<std::thread, void (&)(int), int>(std::thread*, void (&)(int), int&&) <null> (double-check-locking-pattern+0x0000004034c1)
+    #3 _ZNSt16allocator_traitsISaISt6threadEE9constructIS0_IRFviEiEEEvRS1_PT_DpOT0_ <null> (double-check-locking-pattern+0x000000402fc8)
+    #4 void std::vector<std::thread, std::allocator<std::thread> >::_M_emplace_back_aux<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000403091)
+    #5 void std::vector<std::thread, std::allocator<std::thread> >::emplace_back<void (&)(int), int>(void (&)(int), int&&) <null> (double-check-locking-pattern+0x000000402cfb)
+    #6 main test/double-check-locking-pattern.cpp:51 (double-check-locking-pattern+0x000000402524)
+
+SUMMARY: ThreadSanitizer: data race test/double-check-locking-pattern.cpp:34 GreenThreadWorker2(void*)
+==================
+use(data) prints 2000, should've been 2000 if no data race
+D0511 21:56:40.467838 13505 src/chloros.cpp:215: ThreadEntry] Thread 3 exiting.
+Finished thread 1.
+ThreadSanitizer: reported 2 warnings
